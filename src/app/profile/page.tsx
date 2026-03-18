@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +41,81 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState<ProjectEntry[]>([
     createEmptyProject(),
   ]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
+  // 加载 Profile 数据
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch("/api/profile");
+      if (res.ok) {
+        const data = await res.json();
+        setBasicInfo({
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          location: data.location || "",
+          summary: data.summary || "",
+        });
+        setSkills(
+          Array.isArray(data.skills)
+            ? data.skills.join(", ")
+            : ""
+        );
+        if (Array.isArray(data.projects) && data.projects.length > 0) {
+          setProjects(data.projects);
+        }
+      }
+    } catch (error) {
+      console.error("加载 Profile 失败:", error);
+    }
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setSaveMessage("");
+
+    try {
+      const skillsArray = skills
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      const res = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...basicInfo,
+          skills: skillsArray,
+          projects: projects.map((p) => ({
+            name: p.name,
+            role: p.role,
+            period: p.period,
+            description: p.description,
+            highlights: p.highlights,
+          })),
+        }),
+      });
+
+      if (res.ok) {
+        setSaveMessage("保存成功！");
+        // 派发自定义事件通知其他页面（如recruitment）数据已更新
+        window.dispatchEvent(new CustomEvent("profileUpdated", { detail: { timestamp: Date.now() } }));
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("保存失败，请重试");
+      }
+    } catch (error) {
+      console.error("保存失败:", error);
+      setSaveMessage("保存失败，请重试");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const addProject = () => {
     setProjects((prev) => [...prev, createEmptyProject()]);
@@ -63,17 +138,32 @@ export default function ProfilePage() {
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">履历素材库</h1>
-          <p className="text-sm text-muted-foreground">
-            在这里维护你的全量简历数据，AI 将从中提取最匹配目标岗位的内容
-          </p>
+      <div className="space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold tracking-tight">履历素材库</h1>
+            <p className="text-sm text-muted-foreground">
+              在这里维护你的全量简历数据，AI 将从中提取最匹配目标岗位的内容
+            </p>
+          </div>
+          <Button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="shadow-sm shadow-indigo-500/20"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {isSaving ? "保存中..." : "保存全部"}
+          </Button>
         </div>
-        <Button className="shadow-sm shadow-indigo-500/20">
-          <Save className="mr-2 h-4 w-4" />
-          保存全部
-        </Button>
+        {saveMessage && (
+          <div className={`rounded-lg px-4 py-2 text-sm font-medium ${
+            saveMessage.includes("成功") 
+              ? "bg-green-50 text-green-700" 
+              : "bg-red-50 text-red-700"
+          }`}>
+            {saveMessage}
+          </div>
+        )}
       </div>
 
       {/* 基本信息 */}

@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateObject } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
-import { createAnthropic } from "@ai-sdk/anthropic";
 import {
   tailorResultSchema,
   tailorRequestSchema,
@@ -12,42 +9,74 @@ import {
 // System Prompt
 // ---------------------------------------------------------------------------
 
-const TAILOR_SYSTEM_PROMPT = `你是一个顶级的互联网大厂资深 HR 与技术面霸导师。你的任务是根据用户的【全量履历库】和【目标岗位描述(JD)】，为用户量身定制一份最具竞争力的简历结构，并提供面试预测。
+const TAILOR_SYSTEM_PROMPT = `你是一个资深的招聘顾问和求职导师。根据用户的履历和目标职位 JD，生成定制化的简历结构和面试题目。
 
-绝对遵守以下规则，违反任何一条将导致生成失败：
+重要规则：
+1. 不捏造用户没有的经历和技能
+2. 使用 STAR 法则重新组织经历描述
+3. 最多选 3 个最匹配的项目
+4. 生成 3 个高频面试题和 2 个可能的压力测试题
+5. 提供 1 句面试策略建议
+6. 全部用中文，技术词汇用英文
 
-1. **反幻觉红线**：绝对不准捏造用户没有的经历、技能或数据。你只能做"选择"、"裁剪"、"重组"和"话术包装"。如果用户的经历完全不匹配 JD，请基于用户原有经历提炼可迁移能力（如：沟通、学习能力），切勿无中生有。
-
-2. **STAR 法则重写**：在 tailoredBullets 中，必须用包含具体动作和结果的专业术语重写经历（情境-任务-行动-结果），突出与 JD 中要求相关的数据或关键词。
-
-3. **精准裁剪**：无论用户提供了多少项目，你最多只挑选出最能匹配 JD 核心诉求的 3 个项目。
-
-4. **针对性面试预测**：精准找出用户履历和 JD 之间的"契合点"与"薄弱点"，以此生成面试题。
-   - highFrequencyQuestions：基于契合点生成，帮助用户准备自己的强项。
-   - weaknessQuestions：基于薄弱点生成，帮助用户准备可能被追问的短板。
-
-5. **语言风格**：所有输出使用中文，技术术语保留英文原文（如 React、Kubernetes）。`;
+请返回一个 JSON 对象，格式如下：
+{
+  "tailoredSummary": "100字左右的优势总结",
+  "matchedSkills": ["技能1", "技能2"],
+  "selectedProjects": [
+    {
+      "projectName": "项目名称",
+      "role": "你的角色",
+      "tailoredBullets": ["描述1", "描述2"]
+    }
+  ],
+  "interviewPreparation": {
+    "highFrequencyQuestions": ["问题1", "问题2", "问题3"],
+    "weaknessQuestions": ["问题1", "问题2"],
+    "tips": "面试建议建议"
+  }
+}`;
 
 // ---------------------------------------------------------------------------
-// Model factory — 通过环境变量 AI_PROVIDER 切换底层模型
+// 调用 Kimi API 的函数
 // ---------------------------------------------------------------------------
 
-function getModel() {
-  const provider = process.env.AI_PROVIDER ?? "openai";
+async function callKimiAPI(prompt: string, system: string, signal?: AbortSignal) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  const baseUrl = process.env.OPENAI_BASE_URL || "https://api.moonshot.cn/v1";
+  const model = process.env.OPENAI_MODEL || "moonshot-v1-8k";
 
-  if (provider === "anthropic") {
-    const anthropic = createAnthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY ?? "",
-      baseURL: process.env.ANTHROPIC_BASE_URL,
-    });
-    return anthropic(process.env.ANTHROPIC_MODEL ?? "claude-3-5-sonnet-20240620");
+  console.log(`[tailor] 调用 Kimi API: ${baseUrl}/chat/completions`);
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.5,
+      top_p: 0.8,
+      max_tokens: 4000,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    console.error("[tailor] Kimi API 错误:", data);
+    throw new Error(data.error?.message || `API 错误: ${response.status}`);
   }
 
-  const openai = createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY ?? "",
-    baseURL: process.env.OPENAI_BASE_URL,
-  });
-  return openai(process.env.OPENAI_MODEL ?? "gpt-4o");
+  const data = await response.json();
+  const content = data.choices[0]?.message?.content || "";
+  console.log("[tailor] 收到 AI 响应");
+  return content;
 }
 
 // ---------------------------------------------------------------------------
@@ -55,19 +84,29 @@ function getModel() {
 // ---------------------------------------------------------------------------
 
 function buildUserPrompt(masterProfile: string, targetJd: string): string {
-  return `## 我的全量履历库
+  return `## 📋 我的全量履历库和技能
 
 ${masterProfile}
 
 ---
 
-## 目标岗位 JD
+## 🎯 目标岗位 JD
 
 ${targetJd}
 
 ---
 
-请根据以上信息，为我生成一份高度匹配目标岗位的定制化简历结构和面试预测。`;
+## 📝 任务
+
+请根据以上信息，为我生成一份**高度匹配目标岗位**的定制化简历结构和面试预测。
+
+**关键要求：**
+1. 严格基于我的履历库中的实际经历和技能，不能捏造或过度夸大
+2. 优先选择与目标 JD 最相关的技能和项目
+3. 重点突出那些能直接满足 JD 需求的实际案例
+4. 如果我的履历库中缺少某些 JD 要求的技能，请在建议中提到
+
+请返回前述 JSON 格式的定制化简历结构。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,9 +116,11 @@ ${targetJd}
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    console.log("[tailor] 收到请求");
 
     const parsed = tailorRequestSchema.safeParse(body);
     if (!parsed.success) {
+      console.log("[tailor] 参数校验失败:", parsed.error);
       return NextResponse.json(
         {
           error: "参数校验失败",
@@ -90,23 +131,71 @@ export async function POST(req: NextRequest) {
     }
 
     const { masterProfile, targetJd } = parsed.data;
+    console.log("[tailor] 开始调用 AI 模型...");
 
-    const { object } = await generateObject({
-      model: getModel(),
-      schema: tailorResultSchema,
-      system: TAILOR_SYSTEM_PROMPT,
-      prompt: buildUserPrompt(masterProfile, targetJd),
-    });
+    // 确保 AbortController 支持
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120 * 1000); // 120 秒超时
 
-    const result: TailorResult = object;
+    try {
+      const userPrompt = buildUserPrompt(masterProfile, targetJd);
+      const aiResponse = await callKimiAPI(
+        userPrompt,
+        TAILOR_SYSTEM_PROMPT,
+        controller.signal
+      );
 
-    return NextResponse.json(result);
+      clearTimeout(timeoutId);
+
+      // 解析 JSON 响应
+      let result: TailorResult;
+      try {
+        // 尝试直接解析
+        result = JSON.parse(aiResponse);
+      } catch {
+        // 如果 JSON 在 markdown 代码块中，尝试提取
+        const jsonMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[1]);
+        } else {
+          throw new Error("无法解析 AI 响应为 JSON");
+        }
+      }
+
+      // 验证响应格式
+      const validated = tailorResultSchema.safeParse(result);
+      if (!validated.success) {
+        console.error("[tailor] 响应验证失败:", validated.error);
+        throw new Error("AI 生成的数据格式不符合要求");
+      }
+
+      console.log("[tailor] AI 生成成功");
+      return NextResponse.json(validated.data);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
   } catch (err) {
     console.error("[tailor] AI generation failed:", err);
 
-    const message =
-      err instanceof Error ? err.message : "AI 生成失败，请稍后重试";
+    let errorMessage = "AI 生成失败，请稍后重试";
+    let statusCode = 500;
 
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (err instanceof Error) {
+      errorMessage = err.message;
+
+      if (err.name === "AbortError" || err.message.includes("abort")) {
+        errorMessage = "生成耗时过长（超过 120 秒），请稍后重试";
+        statusCode = 504;
+      } else if (err.message.includes("quota") || err.message.includes("额度")) {
+        errorMessage = "API 额度已用尽，请检查账户";
+        statusCode = 429;
+      } else if (err.message.includes("无法解析") || err.message.includes("格式")) {
+        errorMessage = "AI 返回格式异常，请重试";
+        statusCode = 502;
+      }
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: statusCode });
   }
 }

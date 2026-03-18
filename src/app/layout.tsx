@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/sidebar";
+import { initializeScheduler } from "@/lib/server-scheduler";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -10,6 +11,17 @@ export const metadata: Metadata = {
   description:
     "基于大模型的个人职业生涯管理与智能投递助理。本地存储，隐私优先。",
 };
+
+// 在应用启动时初始化定时任务调度器
+if (typeof global !== "undefined") {
+  // 防止在开发模式下多次初始化
+  if (!(global as any).__schedulerInitialized) {
+    (global as any).__schedulerInitialized = true;
+    initializeScheduler().catch((error) => {
+      console.error("Failed to initialize scheduler:", error);
+    });
+  }
+}
 
 export default function RootLayout({
   children,

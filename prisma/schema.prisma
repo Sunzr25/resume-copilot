@@ -34,3 +34,66 @@ model Application {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+// OpenClaw爬虫数据：职位信息
+model CrawledJob {
+  id            String   @id @default(cuid())
+  crawlTaskId   String   @default("") // OpenClaw任务ID
+  company       String
+  position      String
+  location      String
+  salary        String
+  description   String   @default("")
+  source        String   @default("boss") // boss | lagou | other
+  sourceUrl     String   @default("")
+  rawData       String   @default("{}") // 原始爬虫数据
+  isActive      Boolean  @default(true) // 是否还有效
+  crawledAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // 关联的面经
+  interviews    CrawledInterview[]
+  
+  // 用户喜欢记录
+  userLikes     UserLike[]
+  
+  @@unique([source, sourceUrl])
+}
+
+// OpenClaw爬虫数据：面经信息
+model CrawledInterview {
+  id           String   @id @default(cuid())
+  crawlTaskId  String   @default("")
+  jobId        String
+  job          CrawledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  company      String
+  position     String
+  question     String
+  answer       String   @default("")
+  difficulty   String   @default("medium") // easy | medium | hard
+  frequency    Int      @default(1) // 1-5 frequency score
+  source       String   @default("xiaohongshu") // xiaohongshu | zhihu | other
+  sourceUrl    String   @default("")
+  crawledAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 用户对职位的like记录
+model UserLike {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       CrawledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  likedAt   DateTime @default(now())
+  @@unique([jobId])
+}
+
+// 用户历史填写的技能
+model SkillHistory {
+  id        String   @id @default(cuid())
+  skill     String
+  usedCount Int      @default(1) // 使用次数
+  lastUsed  DateTime @default(now())
+  createdAt DateTime @default(now())
+  @@unique([skill])
+}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { User, Kanban, Wand2, Sparkles, Github, Shield } from "lucide-react";
+import { User, Kanban, Wand2, Sparkles, Github, Shield, Briefcase } from "lucide-react";
 
 const navItems = [
   {
@@ -23,6 +23,12 @@ const navItems = [
     description: "Tailor Studio",
     href: "/tailor",
     icon: Wand2,
+  },
+  {
+    title: "招聘信息库",
+    description: "Job Collections",
+    href: "/recruitment",
+    icon: Briefcase,
   },
 ];
 

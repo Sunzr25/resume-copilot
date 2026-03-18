@@ -88,17 +88,22 @@ OPENAI_API_KEY=sk-你的真实密钥
 OPENAI_MODEL=gpt-4o
 ```
 
-### 4. 启动项目
+### 4. 启动项目（两步，已优化 ✨）
 
 #### Windows
 
 1. 打开项目文件夹
 2. 在地址栏输入 `cmd`
-3. 回车后依次执行：
+3. 回车后首次执行：
 
 ```bash
 npm install
-npx prisma db push
+npm run db:seed
+```
+
+4. 然后启动应用：
+
+```bash
 npm run dev
 ```
 
@@ -106,11 +111,16 @@ npm run dev
 
 1. 打开“终端”
 2. 输入 `cd ` 后把项目文件夹拖进去
-3. 回车后依次执行：
+3. 回车后首次执行：
 
 ```bash
 npm install
-npx prisma db push
+npm run db:seed
+```
+
+4. 然后启动应用：
+
+```bash
 npm run dev
 ```
 
@@ -119,6 +129,9 @@ npm run dev
 ```text
 http://localhost:3000
 ```
+
+> 📝 **自动定时更新已启用**  
+> 应用启动时会自动刷新职位数据库，之后每 8 小时自动更新一次。无需额外终端或命令！
 
 ## 技术实现
 

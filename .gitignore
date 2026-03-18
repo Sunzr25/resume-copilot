@@ -30,6 +30,39 @@ yarn-error.log*
 # vercel
 .vercel
 
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# Project documentation (generated, not needed in repo)
+*_SUMMARY.md
+*_COMPLETE*.md
+*_REPORT.md
+*_GUIDE.md
+*_NOTICE.md
+COMPLETION_NOTICE.md
+DOCUMENTATION_GUIDE.md
+FEATURES.md
+FEATURE_*.md
+IMPLEMENTATION*.md
+INTERACTION_UPDATE.md
+OPENCLAW_*.md
+OPTIMIZATION_*.md
+PDF_*.md
+PROJECT_SUMMARY.md
+QUICK_*.md
+RECRUITMENT_*.md
+RELEASE_NOTES.md
+SCHEDULER_*.md
+VERIFICATION_REPORT.md
+
+.vercel
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
