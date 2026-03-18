@@ -54,7 +54,7 @@
 
 维护你的全量经历、技能、项目、简介，作为 AI 定制的素材源。
 
-![Profile](https://github.com/Sunzr25/resume-copilot/blob/main/public/demo-profile1.png)
+![Profile](https://github.com/Sunzr25/resume-copilot/blob/main/public/demo-profile2.png)
 
 ### AI 定制工作台
 
@@ -66,7 +66,7 @@
 - 面试预测问题
 - LaTeX 简历源码导出
 
-![Tailor](https://github.com/Sunzr25/resume-copilot/blob/main/public/demo-tailor1.png)
+![Tailor](https://github.com/Sunzr25/resume-copilot/blob/main/public/demo-tailor2.png)
 
 ### 投递看板
 
